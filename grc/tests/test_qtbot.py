@@ -871,6 +871,47 @@ def test_file_new_close(qtbot, qapp_cls_, monkeypatch):
         assert win.tabWidget.count() == 4 - i, "File/Close"
 
 
+def test_file_close_inactive_tab(qtbot, qapp_cls_, monkeypatch):
+    """Clicking the close button of a tab that is not the current one closes that tab"""
+    win = qapp_cls_.MainWindow
+    tabs = win.tabWidget
+    prompts = []
+
+    def question(*args):
+        prompts.append(args)
+        return QMessageBox.StandardButton.Discard
+
+    monkeypatch.setattr(QMessageBox, "question", question)
+    qtbot.wait(100)
+
+    for _ in range(2):
+        win.new_triggered()
+    views = [tabs.widget(i) for i in range(tabs.count())]
+    for view in views:
+        view.scene().saved = True
+
+    def open_views():
+        return [tabs.widget(i) for i in range(tabs.count())]
+
+    # Index 0 used to be taken for "no index", so the current tab was closed instead
+    tabs.setCurrentIndex(len(views) - 1)
+    tabs.tabCloseRequested.emit(0)
+    assert open_views() == views[1:], "close button of the first tab"
+    assert tabs.currentWidget() is views[-1]
+
+    # A saved tab is closed without a question, even if the current tab is unsaved
+    views[-1].scene().saved = False
+    tabs.tabCloseRequested.emit(0)
+    assert open_views() == views[2:], "close button of a saved tab"
+    assert not prompts, "no question for a saved tab"
+
+    # Leave a single saved tab for the following tests
+    views[-1].scene().saved = True
+    while tabs.count() > 1:
+        tabs.tabCloseRequested.emit(0)
+    assert open_views() == views[-1:]
+
+
 def test_generate(qtbot, qapp_cls_, monkeypatch, tmp_path):
     fg = qapp_cls_.MainWindow.currentFlowgraph
     view = qapp_cls_.MainWindow.currentView

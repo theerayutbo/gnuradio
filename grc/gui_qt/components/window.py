@@ -1132,7 +1132,7 @@ class MainWindow(QMainWindow, base.Component):
             self.app.VariableEditor.set_scene(self.currentFlowgraphScene)
         self.updateActions()
 
-    def close_triggered(self, tab_index=False) -> Union[str, bool]:
+    def close_triggered(self, tab_index=None) -> Union[str, bool]:
         """
         Closes a tab.
 
@@ -1144,13 +1144,20 @@ class MainWindow(QMainWindow, base.Component):
         """
         log.debug(f"Closing a tab (index {tab_index})")
 
-        file_path = self.currentFlowgraphScene.filename
-        if tab_index == False:
+        # The File/Close action passes its "checked" flag (a bool) instead of an
+        # index. Compare by type: index 0 == False would close the current tab.
+        if tab_index is None or isinstance(tab_index, bool):
             tab_index = self.tabWidget.currentIndex()
 
-        if self.currentFlowgraphScene.saved:
+        scene = self.tabWidget.widget(tab_index).scene()
+        file_path = scene.filename
+
+        if scene.saved:
             self.tabWidget.removeTab(tab_index)
         else:
+            # Show the flowgraph the question is about; saving acts on the
+            # current tab.
+            self.tabWidget.setCurrentIndex(tab_index)
             message = None
             if file_path:
                 message = f"Save changes to {os.path.basename(file_path)} before closing? Your changes will be lost otherwise."
